@@ -1,0 +1,7 @@
+scikit-learn
+pandas
+numpy
+skl2onnx
+onnxruntime
+huggingface_hub
+joblib

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalp Hastalığı Tahmini</title>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<style>
+  :root { --bg:#faf7f5; --card:#fff; --ink:#1f1b1a; --muted:#6b6360; --line:#e7e0dc;
+          --accent:#c0392b; --ok:#2e7d5b; --warn:#b45309; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161312; --card:#201c1b; --ink:#f1ecea; --muted:#a59d99; --line:#3a3331;
+            --accent:#e5675a; --ok:#5cc29a; --warn:#f0a44b; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:32px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:26px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  form { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px 18px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); }
+  input, select { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line);
+                  border-radius:8px; padding:8px 10px; }
+  button { grid-column:1/-1; font:inherit; font-weight:600; color:#fff; background:var(--accent);
+           border:0; border-radius:10px; padding:12px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  #result { margin-top:18px; display:none; }
+  .prob { font-size:40px; font-weight:700; }
+  .bar { height:10px; border-radius:6px; background:var(--line); overflow:hidden; margin:8px 0; }
+  .bar > div { height:100%; width:0; background:var(--accent); transition:width .4s; }
+  .meta { color:var(--muted); font-size:13px; margin-top:16px; }
+  .meta a { color:inherit; }
+  .warn { color:var(--warn); font-size:13px; margin-top:12px; }
+  #status { color:var(--muted); font-size:13px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kalp Hastalığı Tahmini</h1>
+  <p class="sub">Model Hugging Face'ten indirilir ve tahmin tamamen tarayıcınızda (ONNX) hesaplanır. Girdiğiniz veriler hiçbir sunucuya gönderilmez.</p>
+
+  <div class="card">
+    <div id="status">Model yükleniyor…</div>
+    <form id="form"></form>
+    <div id="result">
+      <div>Kalp hastalığı olasılığı</div>
+      <div class="prob" id="prob">–</div>
+      <div class="bar"><div id="barfill"></div></div>
+      <div id="label"></div>
+    </div>
+    <p class="warn">⚠️ Yalnız eğitim/demo amaçlıdır; tıbbi karar için kullanılmaz.</p>
+  </div>
+  <p class="meta" id="meta"></p>
+</main>
+
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+
+  // Model kaynağı: ?base=<klasör URL'si> (yerel test) > ?repo= > site.json
+  let base = params.get("base");
+  let repo = params.get("repo");
+  if (!base) {
+    if (!repo) repo = (await (await fetch("site.json")).json()).repo;
+    base = `https://huggingface.co/${repo}/resolve/main/`;
+  }
+  if (!base.endsWith("/")) base += "/";
+
+  try {
+    const cfg = await (await fetch(base + "config.json")).json();
+    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+    const session = await ort.InferenceSession.create(base + "model.onnx");
+
+    // Formu config.features'tan üret
+    const form = $("form");
+    for (const f of cfg.features) {
+      const lab = document.createElement("label");
+      lab.textContent = f.label;
+      let el;
+      if (f.options) {
+        el = document.createElement("select");
+        for (const [v, t] of Object.entries(f.options)) el.add(new Option(t, v));
+      } else {
+        el = document.createElement("input");
+        el.type = "number";
+        if (f.min !== undefined) el.min = f.min;
+        if (f.max !== undefined) el.max = f.max;
+        el.step = f.step ?? "any";
+        el.required = true;
+      }
+      el.id = f.name;
+      el.value = String(f.example);
+      lab.appendChild(el);
+      form.appendChild(lab);
+    }
+    const btn = document.createElement("button");
+    btn.textContent = "Tahmin et";
+    form.appendChild(btn);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      const values = cfg.features.map((f) => parseFloat($(f.name).value));
+      const input = new ort.Tensor("float32", Float32Array.from(values), [1, values.length]);
+      const out = await session.run({ [session.inputNames[0]]: input });
+      const probs = out.probabilities.data;
+      const p = probs[cfg.classes.indexOf(cfg.positive_class)];
+      $("prob").textContent = (p * 100).toFixed(1) + "%";
+      $("barfill").style.width = (p * 100).toFixed(1) + "%";
+      $("label").textContent = "Model kararı: " + cfg.class_labels[String(p >= 0.5 ? 1 : 0)];
+      $("result").style.display = "block";
+      btn.disabled = false;
+    });
+
+    $("status").textContent = "Model hazır. Değerleri girip tahmin edin.";
+    const m = cfg.metrics || {};
+    const src = repo ? `<a href="https://huggingface.co/${repo}">${repo}</a>` : base;
+    $("meta").innerHTML = `Model: ${src} · Test doğruluğu ${m.accuracy} · AUC ${m.auc} · ` +
+                          `scikit-learn ${cfg.sklearn_version}`;
+  } catch (err) {
+    $("status").textContent = "Model yüklenemedi: " + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
