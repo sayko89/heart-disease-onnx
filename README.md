@@ -49,6 +49,7 @@ The model itself is deliberately simple. The pipeline is the point.
 | **Model and model card** | [huggingface.co/saiyko/heart-disease-onnx](https://huggingface.co/saiyko/heart-disease-onnx) |
 | **Reference project** | [seyyah/huggingface-hello-web](https://github.com/seyyah/huggingface-hello-web) |
 | **Dataset** | [UCI Heart Disease](https://doi.org/10.24432/C52P4X) |
+| **Video Link** | https://youtube.com/shorts/aujfkt4OCXU?feature=share |
 
 ---
 
