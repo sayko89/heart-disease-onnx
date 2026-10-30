@@ -1,217 +1,225 @@
-<div align="center">
+<p align="center">
+  <img src="docs/screenshot-form.png" alt="Heart disease prediction page" width="560">
+</p>
 
-#  Kalp Hastalığı Tahmini
+<p align="center">
+  <a href="https://sayko89.github.io/heart-disease-onnx/"><img src="https://img.shields.io/badge/LIVE%20DEMO-GitHub%20Pages-c0392b?style=for-the-badge" alt="Live demo"></a>
+  <a href="https://huggingface.co/saiyko/heart-disease-onnx"><img src="https://img.shields.io/badge/MODEL-Hugging%20Face-f5b301?style=for-the-badge" alt="Model on Hugging Face"></a>
+  <img src="https://img.shields.io/badge/FORMAT-ONNX-1f6feb?style=for-the-badge" alt="ONNX">
+  <img src="https://img.shields.io/badge/TEST%20AUC-0.93-2e7d5b?style=for-the-badge" alt="Test AUC 0.93">
+</p>
 
-**Hugging Face'te barındırılan, tamamen tarayıcıda çalışan bir makine öğrenmesi modeli**
+# Heart Disease Prediction
 
-[![Canlı Demo](https://img.shields.io/badge/Canlı_Demo-GitHub_Pages-c0392b?style=for-the-badge&logo=github)](https://sayko89.github.io/heart-disease-onnx/)
-[![Hugging Face](https://img.shields.io/badge/Model-Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/saiyko/heart-disease-onnx)
+**A small heart disease model, hosted for free on Hugging Face and run entirely in the browser.**
 
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white)
-![ONNX](https://img.shields.io/badge/ONNX-005CED?logo=onnx&logoColor=white)
-![ONNX Runtime Web](https://img.shields.io/badge/onnxruntime--web-JavaScript-F7DF1E?logo=javascript&logoColor=black)
-![License](https://img.shields.io/badge/License-CC_BY_4.0-lightgrey)
+Course assignment · Samsun University, Software Engineering · October 2026
 
-[Canlı demo](https://sayko89.github.io/heart-disease-onnx/) ·
-[Model kartı](https://huggingface.co/saiyko/heart-disease-onnx) ·
-[Hızlı başlangıç](#-hızlı-başlangıç) ·
-[Nasıl çalışır?](#-nasıl-çalışır)
+1. [The idea](#the-idea)
+2. [Links](#links)
+3. [How it works](#how-it-works)
+4. [What we found in the data](#what-we-found-in-the-data)
+5. [Results](#results)
+6. [Running it yourself](#running-it-yourself)
+7. [The model contract](#the-model-contract)
+8. [Design decisions](#design-decisions)
+9. [Known limitations](#known-limitations)
+10. [Repository layout](#repository-layout)
+11. [Assignment checklist](#assignment-checklist)
 
-</div>
+---
 
-<!-- Ekran görüntüsü eklemek için: sayfanın görüntüsünü docs/screenshot.png olarak kaydedin
-     ve aşağıdaki satırın başındaki/sonundaki yorum işaretlerini silin.
-<p align="center"><img src="docs/screenshot.png" alt="Demo sayfası" width="720"></p>
--->
+## The idea
 
-> [!WARNING]
-> Bu model yalnızca **eğitim ve demo** amaçlıdır. Tıbbi teşhis, tedavi veya herhangi bir klinik karar için **kullanılmaz**.
+The assignment was to rebuild [seyyah/huggingface-hello-web](https://github.com/seyyah/huggingface-hello-web) with our own model: train something locally, publish it on Hugging Face, and use it from a web page.
 
-## ✨ Öne çıkanlar
+We picked heart disease. You fill in 13 values from a patient's examination, press one button, and get a probability. The page downloads the model from Hugging Face and does the math in your browser. Nothing you type is sent anywhere.
+
+The model itself is deliberately simple. The pipeline is the point.
+
+> **Not a medical tool.** This is a classroom project trained on a small dataset from the 1980s. Do not use it to make decisions about anyone's health.
+
+---
+
+## Links
 
 | | |
 |---|---|
-| 🔒 **Veri tarayıcıdan çıkmaz** | Tahmin `onnxruntime-web` ile kullanıcının cihazında hesaplanır; hiçbir sunucuya veri gönderilmez. |
-| 💸 **Tamamen ücretsiz** | Model Hugging Face Hub'da, site GitHub Pages'te barınır. Sunucu yok, maliyet yok. |
-| 🎯 **Her yerde aynı sonuç** | Aynı girdi için scikit-learn, Python ONNX ve tarayıcı **0.4446** verir; dönüşüm her eğitimde otomatik doğrulanır. |
-| 🧩 **Kodsuz model değişimi** | Web formu `config.json`'dan üretilir. Yeni model yüklemek için arayüz kodu değişmez. |
-| 🧹 **Temizlenmiş veri** | Yaygın CSV sürümündeki ters kodlanmış hedef ve gizli eksik değerler düzeltildi ([ayrıntılar](#-veri-seti)). |
+| **Try it** | [sayko89.github.io/heart-disease-onnx](https://sayko89.github.io/heart-disease-onnx/) |
+| **Model and model card** | [huggingface.co/saiyko/heart-disease-onnx](https://huggingface.co/saiyko/heart-disease-onnx) |
+| **Reference project** | [seyyah/huggingface-hello-web](https://github.com/seyyah/huggingface-hello-web) |
+| **Dataset** | [UCI Heart Disease](https://doi.org/10.24432/C52P4X) |
 
-## 📊 Sonuçlar
+---
 
-<table>
-<tr>
-<td valign="top">
+## How it works
 
-**Test seti** (%30, n = 89)
+```
+data/heart.csv
+     │  hf_cli.py train      clean → train → export to ONNX → check ONNX matches sklearn
+     ▼
+_out/model/  model.onnx · config.json · README.md
+     │  hf_cli.py push
+     ▼
+Hugging Face model repo  (free, files served with CORS)
+     │  fetch
+     ▼
+web/index.html on GitHub Pages  →  onnxruntime-web  →  probability
+```
 
-| Metrik | Değer |
+**Training** happens on our own machine. A scikit-learn pipeline (`StandardScaler → LogisticRegression`) is trained on 70% of the data and tested on the rest.
+
+**Export.** `skl2onnx` converts the pipeline to a 694-byte `model.onnx`. Right after export the script runs both versions on the test set and stops if they disagree by more than 1e-4. In practice the gap is around 1e-7.
+
+**Hosting.** Hugging Face only stores the files. It does not run anything for us.
+
+**Inference.** The web page reads `config.json`, builds the form from it, loads `model.onnx` with `onnxruntime-web` and runs it locally.
+
+The same reference patient gives **0.4446** everywhere we tested it: scikit-learn, ONNX Runtime in Python, the model downloaded back from Hugging Face, and the browser.
+
+<p align="center">
+  <img src="docs/screenshot-result.png" alt="Prediction result" width="560"><br>
+  <sub>The reference patient in the browser. Same number as in Python.</sub>
+</p>
+
+---
+
+## What we found in the data
+
+We used the 303-row CSV version of the Cleveland dataset that most tutorials use. Before training anything we compared it with the original UCI files. Two things were wrong.
+
+**The label is flipped.** In this CSV, `target = 1` means *no* heart disease. Patients with `target = 1` have a higher maximum heart rate, less exercise-induced angina and fewer blocked vessels. That is the healthy group. A model trained on the raw column would happily predict the opposite of what the page says. We create our own column, `hastalik = 1 - target`, and train on that.
+
+**Missing values are disguised as categories.** `ca = 4` and `thal = 0` do not exist in the original data. They are where the missing values used to be. We drop those 7 rows.
+
+That leaves **296 patients: 136 with heart disease, 160 without.**
+
+The category codes were also renumbered compared with the UCI documentation. We matched them back by counting how often each value appears in both versions. For example, chest pain type `0` here is "asymptomatic", which is `4` in the original.
+
+---
+
+## Results
+
+**Held-out test set** (30%, 89 patients)
+
+| Metric | Value |
 |---|---|
-| Doğruluk | **0.888** |
-| ROC AUC | **0.931** |
+| Accuracy | 0.888 |
+| ROC AUC | 0.931 |
 | Precision | 0.970 |
 | Recall | 0.780 |
 | F1 | 0.865 |
 
-</td>
-<td valign="top">
+**Confusion matrix**
 
-**5-katlı çapraz doğrulama** (n = 296)
-
-| Metrik | Ortalama ± std |
-|---|---|
-| ROC AUC | 0.907 ± 0.053 |
-| Doğruluk | 0.862 ± 0.051 |
-
-**Karışıklık matrisi**
-
-| | Tahmin: yok | Tahmin: var |
+| | Predicted healthy | Predicted disease |
 |---|---|---|
-| **Gerçek: yok** | 47 | 1 |
-| **Gerçek: var** | 9 | 32 |
+| **Actually healthy** | 47 | 1 |
+| **Actually disease** | **9** | 32 |
 
-</td>
-</tr>
-</table>
+**5-fold cross-validation** on all 296 patients: AUC **0.907 ± 0.053**, accuracy **0.862 ± 0.051**. With this little data, a single split is lucky or unlucky by a few points, so this is the more honest number.
 
-> [!NOTE]
-> Model çok az yanlış alarm veriyor (1), ama gerçekten hasta olan 41 kişiden **9'unu kaçırıyor**. Sağlıkta en pahalı hata bu olduğu için, gerçek bir tarama senaryosunda karar eşiğinin 0.5'in altına çekilmesi gerekirdi.
+The headline accuracy hides the important part. The model almost never raises a false alarm, but it misses **9 of the 41** sick patients. For a screening tool that is the wrong way round: a missed patient costs far more than an extra test. A real version would need a lower threshold and would accept more false alarms in return.
 
-## 🔄 Nasıl çalışır?
+The full list of features, their encodings and the model's coefficients are on the [model card](https://huggingface.co/saiyko/heart-disease-onnx).
 
-```mermaid
-flowchart LR
-    A[("data/heart.csv<br/>UCI Cleveland")] -->|hf_cli.py train| B["scikit-learn<br/>StandardScaler → LogReg"]
-    B -->|skl2onnx| C["model.onnx<br/>+ config.json"]
-    C -->|hf_cli.py push| D[("🤗 Hugging Face<br/>model reposu")]
-    D -->|"resolve URL<br/>(CORS açık)"| E["🌐 GitHub Pages<br/>index.html"]
-    E -->|onnxruntime-web| F(["Tahmin<br/>tarayıcıda"])
-```
+---
 
-1. **Eğitim (yerelde):** Veri temizlenir, `StandardScaler → LogisticRegression` pipeline'ı eğitilir.
-2. **Dönüşüm:** Model `skl2onnx` ile ONNX'e çevrilir; ONNX ve sklearn çıktıları karşılaştırılır (fark ~1e-7).
-3. **Barındırma:** `model.onnx`, `config.json` ve İngilizce model kartı Hugging Face'e yüklenir.
-4. **Sunum:** GitHub Pages'teki sayfa modeli Hugging Face'ten indirir ve tahmini tarayıcıda yapar.
+## Running it yourself
 
-<details>
-<summary><b>Neden Hugging Face Space ya da Inference API değil?</b></summary>
-
-<br>
-
-Hugging Face'in sunucuda çalıştırma seçenekleri (Serverless Inference, Gradio Space) scikit-learn modellerini desteklemiyor ya da PRO hesap gerektiriyor. Model reposu ise ücretsiz ve dosyaları CORS açık URL'lerle sunuyor. Bu yüzden Hugging Face yalnızca **dosya deposu** olarak kullanılıyor, hesaplama tarayıcıda yapılıyor.
-
-</details>
-
-## 🚀 Hızlı başlangıç
-
-**1. Kurulum**
+You need Python 3.10+ and a free Hugging Face account with a **Write** token.
 
 ```bash
-git clone https://github.com/sayko89/heart-disease-onnx.git
-cd heart-disease-onnx
-python -m venv .venv
-.venv\Scripts\activate           # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-hf auth login                    # bir kez — "Write" token: huggingface.co/settings/tokens
+hf auth login
+
+python hf_cli.py train                                    # train, export, verify
+python hf_cli.py predict                                  # local check, should print 0.4446
+python hf_cli.py push --repo YOU/heart-disease-onnx --demo https://YOU.github.io/heart-disease-onnx/
+python hf_cli.py hub-predict --repo YOU/heart-disease-onnx
+python hf_cli.py pages --repo YOU/heart-disease-onnx      # points the page at your model
 ```
 
-**2. Eğit → yükle → yayınla**
+Then in the GitHub repo: **Settings → Pages → Source: GitHub Actions**. Every push to `main` that touches `web/` republishes the site.
 
-```bash
-python hf_cli.py train                                     # eğit + ONNX + doğrulama
-python hf_cli.py predict                                   # yerel test → 0.4446
-python hf_cli.py push --repo KULLANICI/heart-disease-onnx \
-                      --demo https://KULLANICI.github.io/heart-disease-onnx/
-python hf_cli.py hub-predict --repo KULLANICI/heart-disease-onnx   # HF'deki modelle test
-python hf_cli.py pages --repo KULLANICI/heart-disease-onnx         # web/site.json'u ayarlar
-```
-
-**3. GitHub Pages:** Repo → *Settings → Pages → Source: **GitHub Actions***. Her push'ta [`pages.yml`](.github/workflows/pages.yml) `web/` klasörünü yayınlar.
-
-<details>
-<summary><b>Hugging Face'e yüklemeden yerelde denemek</b></summary>
-
-<br>
+**Trying the page without uploading anything:**
 
 ```bash
 python hf_cli.py train
 python -m http.server 8000
+# open http://localhost:8000/web/?base=/_out/model/
 ```
 
-Tarayıcıda: `http://localhost:8000/web/?base=/_out/model/`
+**On Windows**, if `hf` is "not recognized" after installing, the Scripts folder is not on your PATH. Either add it or use `python -c "from huggingface_hub import login; login()"` instead.
 
-Sayfayı başka bir modelle açmak için: `?repo=kullanici/repo`
+---
 
-</details>
+## The model contract
 
-<details>
-<summary><b>Tüm CLI komutları</b></summary>
+Everything that reads the model relies on two files and nothing else.
 
-<br>
-
-| Komut | Ne yapar |
+| File | What it holds |
 |---|---|
-| `train` | Veriyi temizler, modeli eğitir, metrikleri hesaplar, ONNX'e çevirip doğrular → `_out/model/` |
-| `predict` | Yerel ONNX modeliyle örnek tahmin |
-| `push --repo R [--demo URL]` | İngilizce model kartını üretir, `_out/model/` klasörünü Hugging Face'e yükler |
-| `hub-predict --repo R` | Modeli Hugging Face'ten indirip tahmin yapar |
-| `pages --repo R` | Web sayfasının göstereceği modeli `web/site.json`'a yazar |
+| `model.onnx` | Input `input`, float32 `[n, 13]`, columns in `config.json` order. Outputs `probabilities`, float32 `[n, 2]`, and `label`. |
+| `config.json` | Feature names, Turkish labels, example values, ranges, dropdown options, class labels, metrics, coefficients and library versions. |
 
-</details>
+The web form is generated from `config.json`. Swap in a different scikit-learn model with the same contract and the page keeps working without a single code change.
 
-## 🧬 Veri seti
+---
 
-[UCI Heart Disease (Cleveland)](https://doi.org/10.24432/C52P4X) verisinin yaygın kullanılan 303 satırlık CSV sürümü; 13 klinik özellik (yaş, cinsiyet, göğüs ağrısı tipi, kan basıncı, kolesterol, EKG, maksimum nabız, talyum testi vb.).
+## Design decisions
 
-> [!IMPORTANT]
-> Bu CSV sürümünde iki bilinen hata var ve `hf_cli.py` ikisini de düzeltiyor:
->
-> 1. **Hedef ters kodlanmış:** `target = 1` aslında *hastalık yok* demek. `target = 1` olanlarda maksimum nabız daha yüksek, egzersiz anginası ve tıkalı damar sayısı daha düşük. Bu yüzden açık bir `hastalik = 1 - target` sütunu üretiliyor.
-> 2. **Eksik değerler gizlenmiş:** `ca = 4` (5 satır) ve `thal = 0` (2 satır) orijinal veride eksik olan değerler. Bu 7 satır çıkarılıyor → **296 hasta** (136'sı hasta, 160'ı sağlıklı).
+| Decision | Why |
+|---|---|
+| **Logistic regression, not a bigger model** | It is accurate enough on 296 rows, converts cleanly to ONNX, and its coefficients can be read. |
+| **Hugging Face as file storage only** | Serverless inference does not support scikit-learn, and Gradio Spaces need a paid account. Model repos are free. |
+| **Inference in the browser** | No server to pay for or keep alive, and the patient data never leaves the device. |
+| **ONNX, not just the pickle** | `model.joblib` only loads with the exact scikit-learn version and can run arbitrary code. ONNX has neither problem. |
+| **Form built from `config.json`** | The page should not need editing every time the model changes. |
+| **Turkish interface, English model card** | The page is for us and our classmates. The model card is for anyone who finds it on Hugging Face. |
 
-Özelliklerin tam listesi, kodlamaları ve model katsayıları [model kartında](https://huggingface.co/saiyko/heart-disease-onnx) yer alıyor.
+---
 
-## 📁 Proje yapısı
+## Known limitations
+
+- 296 patients from a single US clinic, collected in the 1980s. We have no idea how it would do on patients in Samsun today.
+- About two thirds of the patients are men, so predictions for women rest on less data.
+- Everyone in the dataset had already been referred for an angiogram. The base rate is much higher than in the general population, so the probabilities do not mean much for screening healthy people.
+- Category codes are fed in as plain numbers. A one-hot encoding would be more correct but would make the ONNX contract and the form messier.
+- The model file is public. This approach is fine for an open dataset and wrong for a model trained on private patient records.
+
+---
+
+## Repository layout
 
 ```
 heart-disease-onnx/
-├── hf_cli.py                 # CLI: train · predict · push · hub-predict · pages
+├── hf_cli.py                train, predict, push, hub-predict, pages
 ├── requirements.txt
-├── data/
-│   └── heart.csv             # UCI Cleveland (303 satır, ham)
+├── data/heart.csv           raw Cleveland CSV (303 rows)
 ├── web/
-│   ├── index.html            # Demo sayfası (onnxruntime-web)
-│   └── site.json             # Gösterilecek Hugging Face reposu
+│   ├── index.html           the demo page
+│   └── site.json            which Hugging Face repo the page loads
+├── docs/                    screenshots for this README
 ├── .github/workflows/
-│   └── pages.yml             # web/ → GitHub Pages
-└── _out/model/               # train çıktısı (git'e girmez)
-    ├── model.onnx
-    ├── model.joblib
-    ├── config.json
-    └── README.md             # Hugging Face model kartı
+│   └── pages.yml            publishes web/ to GitHub Pages
+└── _out/model/              created by `train`, not committed
 ```
 
-## 📜 Model sözleşmesi
+---
 
-| Dosya | İçerik |
+## Assignment checklist
+
+| Deliverable | Where |
 |---|---|
-| `model.onnx` | Girdi `input` float32 `[n, 13]` (sıra = `config.features`) → çıktı `probabilities` float32 `[n, 2]` ve `label` |
-| `config.json` | `features[{name, label, example, min/max/step \| options}]`, `classes`, `class_labels`, `metrics`, `coefficients`, sürüm bilgileri |
+| Model trained locally, own dataset | `hf_cli.py train`, `data/heart.csv` |
+| Model published on Hugging Face | [saiyko/heart-disease-onnx](https://huggingface.co/saiyko/heart-disease-onnx) |
+| Model card | English, with data cleaning, metrics, limitations and usage examples |
+| Web page using the model | [Live demo](https://sayko89.github.io/heart-disease-onnx/), `web/index.html` |
+| Same result in every runtime | 0.4446 in sklearn, ONNX, Hugging Face download and browser |
+| Reproducible from the command line | [Running it yourself](#running-it-yourself) |
 
-Web formu bu sözleşmeden üretildiği için, `predict_proba`'sı olan ve `skl2onnx`'in çevirebildiği her scikit-learn pipeline'ı arayüze dokunmadan değiştirilebilir.
+---
 
-## ⚠️ Kısıtlar
-
-- Tek bir ABD kliniğinden, 1980'lerde toplanmış 296 hastalık küçük bir veri; diğer popülasyonlara genellenemez.
-- Hastaların yaklaşık üçte ikisi erkek; model kadınlar için daha az güvenilir.
-- Model dosyası herkese açık ve tahmin istemcide yapılıyor; bu yöntem **gizli hasta verisiyle eğitilmiş modeller için kullanılmamalı**.
-
-## 🙏 Teşekkür ve kaynaklar
-
-- Proje yapısı [seyyah/huggingface-hello-web](https://github.com/seyyah/huggingface-hello-web) örneğinden esinlenmiştir.
-- Veri: Janosi, A., Steinbrunn, W., Pfisterer, M., & Detrano, R. (1989). *Heart Disease* [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C52P4X — CC BY 4.0
-
-<div align="center">
-<sub>Samsun Üniversitesi · Yazılım Mühendisliği · 2026</sub>
-</div>
+Dataset: Janosi, A., Steinbrunn, W., Pfisterer, M., & Detrano, R. (1989). *Heart Disease*. UCI Machine Learning Repository. https://doi.org/10.24432/C52P4X (CC BY 4.0).
+Structure based on [seyyah/huggingface-hello-web](https://github.com/seyyah/huggingface-hello-web).
