@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🫀 Kalp Hastalığı Tahmini
+#  Kalp Hastalığı Tahmini
 
 **Hugging Face'te barındırılan, tamamen tarayıcıda çalışan bir makine öğrenmesi modeli**
 
