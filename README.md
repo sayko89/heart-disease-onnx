@@ -88,7 +88,7 @@ The same reference patient gives **0.4446** everywhere we tested it: scikit-lear
 
 We used the 303-row CSV version of the Cleveland dataset that most tutorials use. Before training anything we compared it with the original UCI files. Two things were wrong.
 
-**The label is flipped.** In this CSV, `target = 1` means *no* heart disease. Patients with `target = 1` have a higher maximum heart rate, less exercise-induced angina and fewer blocked vessels. That is the healthy group. A model trained on the raw column would happily predict the opposite of what the page says. We create our own column, `hastalik = 1 - target`, and train on that.
+**The label is flipped.** In this CSV, `target = 1` means *no* heart disease. Patients with `target = 1` have a higher maximum heart rate, less exercise-induced angina and fewer blocked vessels. That is the healthy group. A model trained on the raw column would happily predict the opposite of what the page says. We create our own column, `heart_disease = 1 - target`, and train on that.
 
 **Missing values are disguised as categories.** `ca = 4` and `thal = 0` do not exist in the original data. They are where the missing values used to be. We drop those 7 rows.
 
@@ -161,7 +161,7 @@ Everything that reads the model relies on two files and nothing else.
 | File | What it holds |
 |---|---|
 | `model.onnx` | Input `input`, float32 `[n, 13]`, columns in `config.json` order. Outputs `probabilities`, float32 `[n, 2]`, and `label`. |
-| `config.json` | Feature names, Turkish labels, example values, ranges, dropdown options, class labels, metrics, coefficients and library versions. |
+| `config.json` | Feature names, display labels, example values, ranges, dropdown options, class labels, metrics, coefficients and library versions. |
 
 The web form is generated from `config.json`. Swap in a different scikit-learn model with the same contract and the page keeps working without a single code change.
 
@@ -176,7 +176,6 @@ The web form is generated from `config.json`. Swap in a different scikit-learn m
 | **Inference in the browser** | No server to pay for or keep alive, and the patient data never leaves the device. |
 | **ONNX, not just the pickle** | `model.joblib` only loads with the exact scikit-learn version and can run arbitrary code. ONNX has neither problem. |
 | **Form built from `config.json`** | The page should not need editing every time the model changes. |
-| **Turkish interface, English model card** | The page is for us and our classmates. The model card is for anyone who finds it on Hugging Face. |
 
 ---
 

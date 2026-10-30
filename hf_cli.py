@@ -1,11 +1,11 @@
-"""Kalp hastalığı tahmini — eğit → ONNX → Hugging Face → GitHub Pages.
+"""Heart disease prediction: train -> ONNX -> Hugging Face -> GitHub Pages.
 
-Kullanım:
-    python hf_cli.py train                     # data/heart.csv → _out/model/
-    python hf_cli.py predict                   # yerel ONNX ile örnek tahmin
-    python hf_cli.py push  --repo KULLANICI/heart-disease-onnx
-    python hf_cli.py hub-predict --repo KULLANICI/heart-disease-onnx
-    python hf_cli.py pages --repo KULLANICI/heart-disease-onnx   # web/site.json'u yazar
+Usage:
+    python hf_cli.py train                     # data/heart.csv -> _out/model/
+    python hf_cli.py predict                   # sample prediction with the local ONNX model
+    python hf_cli.py push  --repo USER/heart-disease-onnx [--demo URL]
+    python hf_cli.py hub-predict --repo USER/heart-disease-onnx
+    python hf_cli.py pages --repo USER/heart-disease-onnx   # writes web/site.json
 """
 import argparse
 import json
@@ -21,42 +21,42 @@ DATA = ROOT / "data" / "heart.csv"
 OUT = ROOT / "_out" / "model"
 SEED = 13
 
-# Sıra önemli: ONNX girdisi bu sırayla [n, 13] float32 bekler.
-# Kodlar bu veri sürümüne göredir (Kaggle/kb22 "heart.csv", UCI Cleveland'dan türetilmiş).
+# Order matters: the ONNX input is a float32 [n, 13] tensor in exactly this column order.
+# Codes follow this CSV version (Kaggle/kb22 "heart.csv", derived from UCI Cleveland).
 FEATURES = [
-    {"name": "age", "label": "Yaş", "example": 54, "min": 20, "max": 90, "step": 1},
-    {"name": "sex", "label": "Cinsiyet", "example": 1,
-     "options": {"0": "Kadın", "1": "Erkek"}},
-    {"name": "cp", "label": "Göğüs ağrısı tipi", "example": 0,
-     "options": {"0": "Asemptomatik", "1": "Atipik angina",
-                 "2": "Anjinal olmayan ağrı", "3": "Tipik angina"}},
-    {"name": "trestbps", "label": "Dinlenme kan basıncı (mmHg)", "example": 130, "min": 80, "max": 220, "step": 1},
-    {"name": "chol", "label": "Kolesterol (mg/dl)", "example": 246, "min": 100, "max": 600, "step": 1},
-    {"name": "fbs", "label": "Açlık kan şekeri > 120 mg/dl", "example": 0,
-     "options": {"0": "Hayır", "1": "Evet"}},
-    {"name": "restecg", "label": "Dinlenme EKG sonucu", "example": 1,
-     "options": {"0": "Sol ventrikül hipertrofisi", "1": "Normal", "2": "ST-T dalga anormalliği"}},
-    {"name": "thalach", "label": "Ulaşılan maks. kalp atışı", "example": 150, "min": 60, "max": 220, "step": 1},
-    {"name": "exang", "label": "Egzersizle gelen angina", "example": 0,
-     "options": {"0": "Hayır", "1": "Evet"}},
-    {"name": "oldpeak", "label": "ST çökmesi (oldpeak)", "example": 1.0, "min": 0, "max": 7, "step": 0.1},
-    {"name": "slope", "label": "ST segment eğimi", "example": 1,
-     "options": {"0": "Aşağı eğimli", "1": "Düz", "2": "Yukarı eğimli"}},
-    {"name": "ca", "label": "Floroskopide boyanan damar sayısı", "example": 0,
+    {"name": "age", "label": "Age", "example": 54, "min": 20, "max": 90, "step": 1},
+    {"name": "sex", "label": "Sex", "example": 1,
+     "options": {"0": "Female", "1": "Male"}},
+    {"name": "cp", "label": "Chest pain type", "example": 0,
+     "options": {"0": "Asymptomatic", "1": "Atypical angina",
+                 "2": "Non-anginal pain", "3": "Typical angina"}},
+    {"name": "trestbps", "label": "Resting blood pressure (mm Hg)", "example": 130, "min": 80, "max": 220, "step": 1},
+    {"name": "chol", "label": "Cholesterol (mg/dl)", "example": 246, "min": 100, "max": 600, "step": 1},
+    {"name": "fbs", "label": "Fasting blood sugar > 120 mg/dl", "example": 0,
+     "options": {"0": "No", "1": "Yes"}},
+    {"name": "restecg", "label": "Resting ECG", "example": 1,
+     "options": {"0": "Left ventricular hypertrophy", "1": "Normal", "2": "ST-T wave abnormality"}},
+    {"name": "thalach", "label": "Max heart rate achieved", "example": 150, "min": 60, "max": 220, "step": 1},
+    {"name": "exang", "label": "Exercise-induced angina", "example": 0,
+     "options": {"0": "No", "1": "Yes"}},
+    {"name": "oldpeak", "label": "ST depression (oldpeak)", "example": 1.0, "min": 0, "max": 7, "step": 0.1},
+    {"name": "slope", "label": "Slope of peak exercise ST segment", "example": 1,
+     "options": {"0": "Downsloping", "1": "Flat", "2": "Upsloping"}},
+    {"name": "ca", "label": "Major vessels colored by fluoroscopy", "example": 0,
      "options": {"0": "0", "1": "1", "2": "2", "3": "3"}},
-    {"name": "thal", "label": "Talyum stres testi", "example": 2,
-     "options": {"1": "Sabit defekt", "2": "Normal", "3": "Geri dönüşlü defekt"}},
+    {"name": "thal", "label": "Thallium stress test", "example": 2,
+     "options": {"1": "Fixed defect", "2": "Normal", "3": "Reversible defect"}},
 ]
 FEATURE_NAMES = [f["name"] for f in FEATURES]
-TARGET = "hastalik"
-CLASS_LABELS = {"0": "Kalp hastalığı yok", "1": "Kalp hastalığı var"}
+TARGET = "heart_disease"
+CLASS_LABELS = {"0": "No heart disease", "1": "Heart disease"}
 
 
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA, encoding="utf-8-sig")
-    # 1) Bu sürümde ca=4 ve thal=0 orijinal veride eksik (NaN) olan değerlerdir → at.
+    # 1) In this version ca=4 and thal=0 stand for values that are missing in the original data: drop them.
     df = df[(df["ca"] != 4) & (df["thal"] != 0)].copy()
-    # 2) Bu sürümde 'target' ters kodlanmış: 1 = hastalık YOK. Açık bir hedef sütunu üret.
+    # 2) 'target' is inverted here (1 = NO disease). Build an explicit label instead.
     df[TARGET] = 1 - df["target"]
     return df
 
@@ -101,8 +101,8 @@ def cmd_train(_args):
                "cv5_accuracy_mean": round(float(cv_acc.mean()), 4), "cv5_accuracy_std": round(float(cv_acc.std()), 4),
                "n_train": int(len(ytr)), "n_test": int(len(yte)),
                "n_total": int(len(y)), "n_positive": int(y.sum())}
-    print("Test metrikleri:", {k: metrics[k] for k in ("accuracy", "auc", "precision", "recall", "f1")})
-    print(f"5-katlı CV AUC: {metrics['cv5_auc_mean']} ± {metrics['cv5_auc_std']}")
+    print("Test metrics:", {k: metrics[k] for k in ("accuracy", "auc", "precision", "recall", "f1")})
+    print(f"5-fold CV AUC: {metrics['cv5_auc_mean']} ± {metrics['cv5_auc_std']}")
     coefs = {n: round(float(c), 4) for n, c in zip(FEATURE_NAMES, model.named_steps["lr"].coef_[0])}
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -111,18 +111,18 @@ def cmd_train(_args):
     (OUT / "model.onnx").write_bytes(onx.SerializeToString())
     joblib.dump(model, OUT / "model.joblib")
 
-    # ONNX ↔ sklearn eşdeğerlik kontrolü
+    # Check that ONNX and scikit-learn agree
     sess = ort.InferenceSession(str(OUT / "model.onnx"))
     onnx_proba = sess.run(["probabilities"], {"input": Xte})[0][:, 1]
     diff = float(np.max(np.abs(onnx_proba - proba)))
-    print(f"ONNX ↔ sklearn maks. fark: {diff:.2e}")
+    print(f"Max ONNX vs sklearn difference: {diff:.2e}")
     if diff > 1e-4:
-        sys.exit("HATA: ONNX çıktısı sklearn ile uyuşmuyor!")
+        sys.exit("ERROR: ONNX output does not match scikit-learn!")
 
     config = {
-        "title": "Kalp hastalığı tahmini",
-        "description": "UCI Cleveland kalp hastalığı verisiyle eğitilmiş lojistik regresyon. "
-                       "Yalnız eğitim/demo amaçlıdır; tıbbi karar için KULLANILMAZ.",
+        "title": "Heart disease prediction",
+        "description": "Logistic regression trained on the UCI Cleveland heart disease data. "
+                       "For education and demonstration only; NOT for medical decisions.",
         "target": TARGET,
         "classes": [int(c) for c in model.classes_],
         "class_labels": CLASS_LABELS,
@@ -136,10 +136,10 @@ def cmd_train(_args):
     }
     (OUT / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
     (OUT / "README.md").write_text(model_card(config, "USER/heart-disease-onnx"), encoding="utf-8")
-    print(f"Çıktılar: {OUT}")
+    print(f"Outputs: {OUT}")
 
 
-# English descriptions for the model card (the web UI uses the Turkish labels in FEATURES).
+# Longer descriptions for the model card (the web form uses the short labels in FEATURES).
 FEATURE_DOCS = {
     "age": ("Age in years", "numeric"),
     "sex": ("Sex", "0 = female, 1 = male"),
@@ -415,7 +415,7 @@ def cmd_predict(_args):
     import onnxruntime as ort
     sess = ort.InferenceSession(str(OUT / "model.onnx"))
     p = sess.run(["probabilities"], {"input": example_row()})[0][0]
-    print(f"Örnek girdi → P(kalp hastalığı) = {p[1]:.4f}")
+    print(f"Sample input -> P(heart disease) = {p[1]:.4f}")
 
 
 def cmd_push(args):
@@ -424,8 +424,8 @@ def cmd_push(args):
     cfg = json.loads((OUT / "config.json").read_text(encoding="utf-8"))
     (OUT / "README.md").write_text(model_card(cfg, args.repo, args.demo), encoding="utf-8")
     api.create_repo(args.repo, repo_type="model", exist_ok=True)
-    api.upload_folder(folder_path=str(OUT), repo_id=args.repo, commit_message="Model güncellendi")
-    print(f"Yüklendi: https://huggingface.co/{args.repo}")
+    api.upload_folder(folder_path=str(OUT), repo_id=args.repo, commit_message="Update model")
+    print(f"Uploaded: https://huggingface.co/{args.repo}")
 
 
 def cmd_hub_predict(args):
@@ -433,13 +433,13 @@ def cmd_hub_predict(args):
     from huggingface_hub import hf_hub_download
     sess = ort.InferenceSession(hf_hub_download(args.repo, "model.onnx", force_download=True))
     p = sess.run(["probabilities"], {"input": example_row()})[0][0]
-    print(f"HF'deki model → P(kalp hastalığı) = {p[1]:.4f}")
+    print(f"Model from Hugging Face -> P(heart disease) = {p[1]:.4f}")
 
 
 def cmd_pages(args):
     path = ROOT / "web" / "site.json"
     path.write_text(json.dumps({"repo": args.repo}, indent=2) + "\n", encoding="utf-8")
-    print(f"{path} → repo={args.repo}. Commit + push edince GitHub Actions yayınlar.")
+    print(f"{path} -> repo={args.repo}. Commit and push; GitHub Actions will publish it.")
 
 
 def main():
@@ -449,9 +449,9 @@ def main():
     sub.add_parser("predict").set_defaults(fn=cmd_predict)
     for name, fn in [("push", cmd_push), ("hub-predict", cmd_hub_predict), ("pages", cmd_pages)]:
         p = sub.add_parser(name)
-        p.add_argument("--repo", required=True, help="HF model reposu, ör. kullanici/heart-disease-onnx")
+        p.add_argument("--repo", required=True, help="Hugging Face model repo, e.g. user/heart-disease-onnx")
         if name == "push":
-            p.add_argument("--demo", help="Canlı demo URL'si (model kartına eklenir)")
+            p.add_argument("--demo", help="Live demo URL (added to the model card)")
         p.set_defaults(fn=fn)
     args = ap.parse_args()
     args.fn(args)

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kalp Hastalığı Tahmini</title>
+<title>Heart Disease Prediction</title>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
 <style>
   :root { --bg:#faf7f5; --card:#fff; --ink:#1f1b1a; --muted:#6b6360; --line:#e7e0dc;
@@ -38,19 +38,19 @@
 </head>
 <body>
 <main>
-  <h1>Kalp Hastalığı Tahmini</h1>
-  <p class="sub">Model Hugging Face'ten indirilir ve tahmin tamamen tarayıcınızda (ONNX) hesaplanır. Girdiğiniz veriler hiçbir sunucuya gönderilmez.</p>
+  <h1>Heart Disease Prediction</h1>
+  <p class="sub">The model is downloaded from Hugging Face and the prediction runs entirely in your browser (ONNX). Nothing you enter is sent to a server.</p>
 
   <div class="card">
-    <div id="status">Model yükleniyor…</div>
+    <div id="status">Loading model…</div>
     <form id="form"></form>
     <div id="result">
-      <div>Kalp hastalığı olasılığı</div>
+      <div>Probability of heart disease</div>
       <div class="prob" id="prob">–</div>
       <div class="bar"><div id="barfill"></div></div>
       <div id="label"></div>
     </div>
-    <p class="warn">⚠️ Yalnız eğitim/demo amaçlıdır; tıbbi karar için kullanılmaz.</p>
+    <p class="warn">⚠️ For education and demonstration only. Not for medical decisions.</p>
   </div>
   <p class="meta" id="meta"></p>
 </main>
@@ -60,7 +60,7 @@
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
 
-  // Model kaynağı: ?base=<klasör URL'si> (yerel test) > ?repo= > site.json
+  // Model source: ?base=<folder URL> (local testing) > ?repo= > site.json
   let base = params.get("base");
   let repo = params.get("repo");
   if (!base) {
@@ -74,7 +74,7 @@
     ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
     const session = await ort.InferenceSession.create(base + "model.onnx");
 
-    // Formu config.features'tan üret
+    // Build the form from config.features
     const form = $("form");
     for (const f of cfg.features) {
       const lab = document.createElement("label");
@@ -97,7 +97,7 @@
       form.appendChild(lab);
     }
     const btn = document.createElement("button");
-    btn.textContent = "Tahmin et";
+    btn.textContent = "Predict";
     form.appendChild(btn);
 
     form.addEventListener("submit", async (e) => {
@@ -110,18 +110,18 @@
       const p = probs[cfg.classes.indexOf(cfg.positive_class)];
       $("prob").textContent = (p * 100).toFixed(1) + "%";
       $("barfill").style.width = (p * 100).toFixed(1) + "%";
-      $("label").textContent = "Model kararı: " + cfg.class_labels[String(p >= 0.5 ? 1 : 0)];
+      $("label").textContent = "Prediction: " + cfg.class_labels[String(p >= 0.5 ? 1 : 0)];
       $("result").style.display = "block";
       btn.disabled = false;
     });
 
-    $("status").textContent = "Model hazır. Değerleri girip tahmin edin.";
+    $("status").textContent = "Model ready. Enter the values and press Predict.";
     const m = cfg.metrics || {};
     const src = repo ? `<a href="https://huggingface.co/${repo}">${repo}</a>` : base;
-    $("meta").innerHTML = `Model: ${src} · Test doğruluğu ${m.accuracy} · AUC ${m.auc} · ` +
+    $("meta").innerHTML = `Model: ${src} · Test accuracy ${m.accuracy} · AUC ${m.auc} · ` +
                           `scikit-learn ${cfg.sklearn_version}`;
   } catch (err) {
-    $("status").textContent = "Model yüklenemedi: " + err.message;
+    $("status").textContent = "Could not load the model: " + err.message;
     console.error(err);
   }
 })();
